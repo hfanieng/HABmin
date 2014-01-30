@@ -36,80 +36,96 @@
  */
 
 Ext.define('openHAB.graph.graphHighcharts', {
-    extend:'Ext.panel.Panel',
-    title:'Chart',
-    icon:'images/chart-up.png',
-    layout:'fit',
-    header:false,
+    extend: 'Ext.panel.Panel',
+    icon: 'images/chart-up.png',
+    layout: 'fit',
+    header: false,
     // TODO: does this need to be 'id'?
-    id:'highchartsChart',
+    id: 'highchartsChart',
+    chartObject: null,
 
-    initComponent:function () {
+    initComponent: function () {
+        this.title = language.graph_HighchartsTitle;
+
+        var supportedCharts = [
+            'spline',
+            'line',
+            'area',
+            'areaspline',
+            'bar',
+            'column'
+        ];
+        var supportedMarkers = [
+            'circle',
+            'square',
+            'diamond',
+            'triangle',
+            'triangle-down'
+        ];
         var lastUpdate = 0;
         var rawData = [];
-        var chartObject = null;
         var chartMin = 0;
         var chartMax = 0;
-        var chartChannels = [];
+        var chartConfig = [];
         var chartOptions = {
-            chart:{
-                renderTo:'chartIsHere',
-                animation:false,
-                type:'spline',
-                zoomType:'x',
-                events:{
-                    selection:function (event) {
+            chart: {
+                renderTo: 'chartIsHere',
+                animation: false,
+                type: 'spline',
+                zoomType: 'x',
+                events: {
+                    selection: function (event) {
                         event.preventDefault();
-                        updateChart(chartChannels, Math.floor(event.xAxis[0].min), Math.ceil(event.xAxis[0].max));
+                        updateChart(chartConfig, Math.floor(event.xAxis[0].min), Math.ceil(event.xAxis[0].max));
                     }
                 }
             },
-            credits:{
-                enabled:false
+            credits: {
+                enabled: false
             },
-            title:{
-                text:null
+            title: {
+                text: null
             },
-            xAxis:{
-                type:'datetime',
-                dateTimeLabelFormats:{ // don't display the dummy year
-                    month:'%e. %b',
-                    year:'%b'
+            xAxis: {
+                type: 'datetime',
+                dateTimeLabelFormats: { // don't display the dummy year
+                    month: '%e. %b',
+                    year: '%b'
                 }
             },
-            plotOptions:{
-                spline:{
-                    lineWidth:3,
-                    states:{
-                        hover:{
-                            lineWidth:5
+            plotOptions: {
+                spline: {
+                    lineWidth: 3,
+                    states: {
+                        hover: {
+                            lineWidth: 5
                         }
                     },
-                    marker:{
-                        states:{
-                            hover:{
-                                enabled:true,
-                                symbol:'circle',
-                                radius:5,
-                                lineWidth:1
+                    marker: {
+                        states: {
+                            hover: {
+                                enabled: true,
+                                symbol: 'circle',
+                                radius: 5,
+                                lineWidth: 1
                             }
                         }
                     }
                 },
-                series:{
-                    marker:{
-                        enabled:false
+                series: {
+                    marker: {
+                        enabled: false
                     }
                 }
             },
-            legend:{
-                enabled:true
+            legend: {
+                enabled: true
             },
-            tooltip:{
-                enabled:true,
-                crosshairs:true,
-                shared:false,
-                formatter:function () {
+            tooltip: {
+                enabled: true,
+                crosshairs: true,
+                shared: false,
+                formatter: function () {
                     return '<b>' + this.series.name + '</b><br/>' +
                         Highcharts.dateFormat('%H:%M:%S %a %d %b %Y', this.x) + ': ' +
                         Highcharts.numberFormat(this.y, 2);
@@ -126,11 +142,19 @@ Ext.define('openHAB.graph.graphHighcharts', {
             toolbar.getComponent('viewWeek').enable();
             toolbar.getComponent('viewMonth').enable();
             toolbar.getComponent('viewYear').enable();
-            toolbar.getComponent('info').enable();
+//            toolbar.getComponent('info').enable();
         }
 
         ;
 
+        /**
+         * Process incoming data responses.
+         * This is called when we receive a response to a graph data request.
+         * It correlates the data and waits until all requests are complete
+         * before drawing the graph
+         * @param item
+         * @param json
+         */
         function addGraphData(item, json) {
             // Remember the time of the last data update
             // This allows the table view to detect if data is dirty
@@ -144,10 +168,10 @@ Ext.define('openHAB.graph.graphHighcharts', {
             graphInfoItems[1].value = "";//(new Date()).getTime() - timeStart + " ms";
 
 
-            // Find this channel in rawData
+            // Find this item in rawData
             for (var chan = 0; chan < rawData.length; chan++) {
                 if (rawData[chan].item == item) {
-                    // Mark that we've received this channel
+                    // Mark that we've received this item
                     rawData[chan].received = true;
 
                     // If we have data, process it into the right format for highcharts
@@ -159,10 +183,17 @@ Ext.define('openHAB.graph.graphHighcharts', {
                         else {
                             // Convert the format. Hopefully the openHAB json can be changed to make this unnecessary
                             var newSeries = [];
+                            var subPoints = parseInt(json.datapoints / 1000);
+                            var subCount = 0;
+                            var outCount = 0;
                             for (var i = 0; i < json.datapoints; i++) {
-                                newSeries[i] = [];
-                                newSeries[i][0] = parseInt(json.data[i].time);
-                                newSeries[i][1] = parseFloat(json.data[i].state);
+                                if(subCount++ < subPoints)
+                                    continue;
+                                subCount = 0;
+                                newSeries[outCount] = [];
+                                newSeries[outCount][0] = parseInt(json.data[i].time);
+                                newSeries[outCount][1] = parseFloat(json.data[i].state);
+                                outCount++;
                             }
                             rawData[chan].data = newSeries;
                         }
@@ -180,6 +211,9 @@ Ext.define('openHAB.graph.graphHighcharts', {
             drawChart();
         }
 
+        /**
+         * Draws the chart. This is called after the data has been received.
+         */
         function drawChart() {
             timeStart = (new Date()).getTime();
 
@@ -211,10 +245,6 @@ Ext.define('openHAB.graph.graphHighcharts', {
 //                    graphInfoItems[4 + s].name = json.series[s].label + " points";
 //                    graphInfoItems[4 + s].value = json.series[s].pointsRet + " / " + json.series[s].pointsTot;
 
-                // Get the configuration data from the itemConfigStore
-//                    var dmDev = getDMDevice(json.series[s].Id);
-
-
                 // If ticks are provided, add categories to the graph
 //                    if (rawData[chan].categories) {
 //                        if(rawData[chan].categories.length > 0) {
@@ -225,37 +255,38 @@ Ext.define('openHAB.graph.graphHighcharts', {
 //                        }
 //                    }
 
+                // Configure the series styles...
                 options.series[series].data = rawData[chan].data;
+                options.series[series].name = rawData[chan].label;
+                options.series[series].yAxis = rawData[chan].axis;
 
-                var ref = persistenceItemStore.findExact("name", rawData[chan].item);
-                if (ref != -1)
-                    options.series[series].name = persistenceItemStore.getAt(ref).get("label");
+                if (supportedCharts.indexOf(rawData[chan].chart) > -1)
+                    options.series[series].type = rawData[chan].chart;
                 else
-                    options.series[series].name = rawData[chan].item;
-                options.series[series].yAxis = rawData[chan].yAxis;
-//                    options.series[s].color = '#FF0000';
-                //options.series[series].marker = true;
+                    options.series[series].type = "spline";
 
-//                    if (dmDev == null)
-                options.series[series].type = "spline";
-                /*                    else {
-                 switch (dmDev.Type) {
-                 case 1:
-                 options.series[series].type = "line";
-                 break;
-                 case 2:
-                 options.series[series].type = "scatter";
-                 //                                chartOptions.scatter.marker.enabled = true;
-                 break;
-                 case 3:
-                 case 4:
-                 options.series[series].type = "area";
-                 break;
-                 default:
-                 options.series[series].type = "spline";
-                 break;
-                 }
-                 }*/
+                if (rawData[chan].lineColor != null && rawData[chan].lineColor.length != 0)
+                    options.series[series].color = rawData[chan].lineColor;
+
+                if(rawData[chan].lineWidth != null && parseInt(rawData[chan].lineWidth) != NaN)
+                    options.series[series].lineWidth = rawData[chan].lineWidth;
+
+                if(typeof rawData[chan].legend == 'string' || rawData[chan].legend instanceof String)
+                    options.series[series].showInLegend = (rawData[chan].legend.toLowerCase() == 'true') ? true : false;
+
+                if (rawData[chan].lineStyle != null && rawData[chan].lineStyle.length != 0)
+                    options.series[series].dashStyle = rawData[chan].lineStyle;
+
+                if (supportedMarkers.indexOf(rawData[chan].markerSymbol) > -1) {
+                    options.series[series].marker = {};
+                    options.series[series].marker.enabled = true;
+                    options.series[series].marker.symbol = rawData[chan].markerSymbol;
+
+                    if (rawData[chan].markerColor != null && rawData[chan].markerColor.length != 0) {
+                        options.series[series].marker.fillColor = rawData[chan].markerColor;
+                        options.series[series].marker.lineColor = rawData[chan].markerColor;
+                    }
+                }
 
                 // Keep track of the min/max times
                 if (chartMin < rawData[chan].timestart)
@@ -282,26 +313,42 @@ Ext.define('openHAB.graph.graphHighcharts', {
 
             toolbarEnable();
             if (errors != "") {
-                handleStatusNotification(NOTIFICATION_WARNING,'Warning: ' + error);
+                handleStatusNotification(NOTIFICATION_WARNING, 'Warning: ' + error);
             }
         }
 
+        /**
+         * Update the graph.
+         * Requests data from the server and processes the responses.
+         * @param newConfig Config object for the chart
+         * @param start Start time
+         * @param stop Stop time
+         */
+        function updateChart(newConfig, start, stop) {
+            // A bit of sanity checking before we start...
+            if (newConfig == null || newConfig.items == null || newConfig.items.length == 0)
+                return;
 
-        function updateChart(channels, start, stop) {
-            // Keep track of the current channels
-            chartChannels = channels;
+            // Keep track of the current configuration
+            chartConfig = newConfig;
 
-            // TODO: Something needs to be done about the timers and graph information - do this at the same time as the success/fail calls
+            // Change to arrays
+            if(newConfig.axis != null)
+                newConfig.axis = [].concat(newConfig.axis);
+            if(newConfig.items != null)
+                newConfig.items = [].concat(newConfig.items);
+
+            // TODO: Something needs to be done about the timers and graph information
             var timeStart = (new Date()).getTime();
             var timeInit = timeStart;
 
             Ext.MessageBox.show({
-                msg:'Downloading graph data...',
-                width:100,
-                height:40,
-                icon:'icon-download',
-                draggable:false,
-                closable:false
+                msg: language.graph_HighchartsLoading,
+                width: 100,
+                height: 40,
+                icon: 'icon-download',
+                draggable: false,
+                closable: false
             });
 
             if (isNaN(start))
@@ -322,43 +369,73 @@ Ext.define('openHAB.graph.graphHighcharts', {
             // Remove the categories from the yAxis
             chartOptions.yAxis = [];
             for (var cnt = 0; cnt < 4; cnt++) {
-                chartOptions.yAxis[cnt] = [];
+                chartOptions.yAxis[cnt] = {};
                 chartOptions.yAxis[cnt].title = "";
+            }
+
+            // Configure the axis
+            if (newConfig.axis != null) {
+                for (var cnt = 0; cnt < newConfig.axis.length; cnt++) {
+                    var axis = newConfig.axis[cnt].axis - 1;
+
+                    chartOptions.yAxis[axis] = {};
+                    if(newConfig.axis[cnt].label != null && newConfig.axis[cnt].label.length != 0) {
+                        chartOptions.yAxis[axis].title = {};
+                        chartOptions.yAxis[axis].title.text = newConfig.axis[cnt].label;
+                    }
+                    if(newConfig.axis[cnt].minimum != null) {
+                        chartOptions.yAxis[axis].min = newConfig.axis[cnt].minimum;
+                        chartOptions.yAxis[axis].startOnTick = false;
+                    }
+                    if(newConfig.axis[cnt].maximum != null) {
+                        chartOptions.yAxis[axis].max = newConfig.axis[cnt].maximum;
+                        chartOptions.yAxis[axis].endOnTick = false;
+                    }
+                    if(newConfig.axis[cnt].position == 'right') {
+                        chartOptions.yAxis[axis].opposite = true;
+                    }
+                    if(newConfig.axis[cnt].format != null && newConfig.axis[cnt].format.length != 0) {
+                        chartOptions.yAxis[axis].labels = {};
+                        chartOptions.yAxis[axis].labels.format = newConfig.axis[cnt].format;
+                    }
+                }
             }
 
             // Clear the raw data
             rawData = [];
 
-            // Loop through all channels and request data via Ajax
-            for (var chan = 0; chan < channels.length; chan++) {
+            // Loop through all items and request data via Ajax
+            for (var chan = 0; chan < chartConfig.items.length; chan++) {
                 rawData[chan] = {};
                 rawData[chan].received = false;
-                rawData[chan].item = channels[chan].name;
-
-                // TODO: Resolve the yaxis properly
-                rawData[chan].yAxis = 0;
+                rawData[chan].item = chartConfig.items[chan].item;
+                rawData[chan].axis = chartConfig.items[chan].axis - 1;
+                rawData[chan].label = chartConfig.items[chan].label;
+                rawData[chan].chart = chartConfig.items[chan].chart;
+                rawData[chan].legend = chartConfig.items[chan].legend;
+                rawData[chan].lineWidth = chartConfig.items[chan].lineWidth;
+                rawData[chan].lineColor = chartConfig.items[chan].lineColor;
+                rawData[chan].lineStyle = chartConfig.items[chan].lineStyle;
+                rawData[chan].markerColor = chartConfig.items[chan].markerColor;
+                rawData[chan].markerSymbol = chartConfig.items[chan].markerSymbol;
 
                 Ext.Ajax.request({
-                    url:HABminBaseURL + '/persistence/' + persistenceService + '/' + channels[chan].name,
-                    timeout:20000,
-                    params:parms,
-                    method:'GET',
-                    headers:{'Accept':'application/json'},
-                    success:function (response, opts) {
-                        var item = opts.url.split('/');
-                        var json = Ext.decode(response.responseText);
+                    url: HABminBaseURL + '/persistence/services/' + persistenceService + '/' + chartConfig.items[chan].item,
+                    timeout: 20000,
+                    params: parms,
+                    method: 'GET',
+                    headers: {'Accept': 'application/json'},
+                    callback: function (options, success, response) {
+                        var json = null;
+                        if (success) {
+                            json = Ext.decode(response.responseText);
+                        }
+                        var item = options.url.split('/');
                         addGraphData(item[item.length - 1], json);
-                    },
-                    failure:function (response, opts) {
-                        var item = opts.url.split('/');
-                        // Calling addGraphData allows us to correlate all requests and display a consolidated status
-                        addGraphData(item[item.length - 1], null);
                     }
                 });
             }
-        }
-
-        ;
+        };
 
         function redrawChart() {
             if (this.chartObject != null) {
@@ -376,7 +453,7 @@ Ext.define('openHAB.graph.graphHighcharts', {
 
         function doGraphTime(days) {
             var ts = Math.round((new Date()).getTime());
-            updateChart(chartChannels, ts - (days * 86400000), ts);
+            updateChart(chartConfig, ts - (days * 86400000), ts);
         }
 
         ;
@@ -386,14 +463,14 @@ Ext.define('openHAB.graph.graphHighcharts', {
         // Main initComponent code
 
         var toolbar = Ext.create('Ext.toolbar.Toolbar', {
-            items:[
+            items: [
                 {
-                    icon:'images/zoom_in.png',
-                    itemId:'zoomIn',
-                    disabled:true,
-                    cls:'x-btn-icon',
-                    tooltip:'Zoom In',
-                    handler:function () {
+                    icon: 'images/zoom_in.png',
+                    itemId: 'zoomIn',
+                    disabled: true,
+                    cls: 'x-btn-icon',
+                    tooltip: language.graph_HighchartsZoomIn,
+                    handler: function () {
                         var zoom;
                         var min;
                         var max;
@@ -401,161 +478,161 @@ Ext.define('openHAB.graph.graphHighcharts', {
                         zoom = (chartMax - chartMin) / 5;
                         min = chartMin + zoom;
                         max = chartMin - zoom;
-                        updateChart(chartChannels, min, max);
+                        updateChart(chartConfig, min, max);
                     }
                 },
                 {
-                    icon:'images/zoom_out.png',
-                    itemId:'zoomOut',
-                    disabled:true,
-                    cls:'x-btn-icon',
-                    tooltip:'Zoom Out',
-                    handler:function () {
+                    icon: 'images/zoom_out.png',
+                    itemId: 'zoomOut',
+                    disabled: true,
+                    cls: 'x-btn-icon',
+                    tooltip: language.graph_HighchartsZoomOut,
+                    handler: function () {
                         var zoom;
 
                         zoom = (chartMax - chartMin) / 5;
-                        updateChart(chartChannels, chartMin - zoom, chartMax + zoom);
+                        updateChart(chartConfig, chartMin - zoom, chartMax + zoom);
                     }
                 },
                 '-',
                 {
-                    icon:'images/calendar-select.png',
-                    itemId:'viewDay',
-                    disabled:true,
-                    cls:'x-btn-icon',
-                    tooltip:'Display last day',
-                    handler:function () {
+                    icon: 'images/calendar-select.png',
+                    itemId: 'viewDay',
+                    disabled: true,
+                    cls: 'x-btn-icon',
+                    tooltip: language.graph_HighchartsDisplayDay,
+                    handler: function () {
                         doGraphTime(1);
                     }
                 },
                 {
-                    icon:'images/calendar-select-week.png',
-                    itemId:'viewWeek',
-                    disabled:true,
-                    cls:'x-btn-icon',
-                    tooltip:'Display last week',
-                    handler:function () {
+                    icon: 'images/calendar-select-week.png',
+                    itemId: 'viewWeek',
+                    disabled: true,
+                    cls: 'x-btn-icon',
+                    tooltip: language.graph_HighchartsDisplayWeek,
+                    handler: function () {
                         doGraphTime(7);
                     }
                 },
                 {
-                    icon:'images/calendar-select-month.png',
-                    itemId:'viewMonth',
-                    disabled:true,
-                    cls:'x-btn-icon',
-                    tooltip:'Display last month',
-                    handler:function () {
+                    icon: 'images/calendar-select-month.png',
+                    itemId: 'viewMonth',
+                    disabled: true,
+                    cls: 'x-btn-icon',
+                    tooltip: language.graph_HighchartsDisplayMonth,
+                    handler: function () {
                         doGraphTime(30);
                     }
                 },
                 {
-                    icon:'images/calendar.png',
-                    itemId:'viewYear',
-                    disabled:true,
-                    cls:'x-btn-icon',
-                    tooltip:'Display last year',
-                    handler:function () {
+                    icon: 'images/calendar.png',
+                    itemId: 'viewYear',
+                    disabled: true,
+                    cls: 'x-btn-icon',
+                    tooltip: language.graph_HighchartsDisplayYear,
+                    handler: function () {
                         doGraphTime(365);
                     }
                 },
                 '-',
                 {
-                    icon:'images/arrow_left.png',
-                    itemId:'scrollLeft',
-                    disabled:true,
-                    cls:'x-btn-icon',
-                    tooltip:'Scroll left',
-                    handler:function () {
+                    icon: 'images/arrow_left.png',
+                    itemId: 'scrollLeft',
+                    disabled: true,
+                    cls: 'x-btn-icon',
+                    tooltip: language.graph_HighchartsScrollLeft,
+                    handler: function () {
                         var scroll;
 
                         scroll = (chartMax - chartMin) / 5;
-                        updateChart(chartChannels, chartMin - scroll, chartMax - scroll);
+                        updateChart(chartConfig, chartMin - scroll, chartMax - scroll);
                     }
                 },
                 {
-                    icon:'images/arrow_right.png',
-                    itemId:'scrollRight',
-                    disabled:true,
-                    cls:'x-btn-icon',
-                    tooltip:'Scroll right',
-                    handler:function () {
+                    icon: 'images/arrow_right.png',
+                    itemId: 'scrollRight',
+                    disabled: true,
+                    cls: 'x-btn-icon',
+                    tooltip: language.graph_HighchartsScrollLeft,
+                    handler: function () {
                         var scroll;
 
                         scroll = (chartMax - chartMin) / 5;
-                        updateChart(chartChannels, chartMin + scroll, chartMax + scroll);
-                    }
-                },
-                '-',
-                {
-                    icon:'images/clock.png',
-                    itemId:'realtime',
-                    disabled:true,
-                    cls:'x-btn-icon',
-                    tooltip:'Display real-time graph',
-                    handler:function () {
-                    }
-                },
-                { xtype:'tbfill' },
-                {
-                    icon:'images/information-balloon.png',
-                    itemId:'info',
-                    cls:'x-btn-icon',
-                    disabled:true,
-                    tooltip:'Display information on current graph',
-                    handler:function () {
-                        Ext.create('Ext.data.Store', {
-                            storeId:'graphInfoStore',
-                            fields:['name', 'value'],
-                            data:graphInfoItems
-                        });
-
-                        var graphInfoGrid = Ext.create('Ext.grid.Panel', {
-                            hideHeaders:true,
-                            store:Ext.data.StoreManager.lookup('graphInfoStore'),
-                            columns:[
-                                { text:'Name', dataIndex:'name', width:250 },
-                                { text:'Value', dataIndex:'value', flex:1 }
-                            ],
-                            disableSelection:true,
-                            viewConfig:{
-                                trackOver:false
-                            }
-                        });
-
-                        var grWin = Ext.create('Ext.Window', {
-                            title:'Graph Information',
-                            width:350,
-                            height:300,
-                            modal:true,
-                            resizable:false,
-                            draggable:false,
-                            itemId:'chartInfo',
-                            items:[graphInfoGrid]
-                        });
-
-                        grWin.show();
-                        grWin.alignTo(Ext.get("chartIsHere"), "tr-tr");
+                        updateChart(chartConfig, chartMin + scroll, chartMax + scroll);
                     }
                 }
+                /*                ,'-',
+                 {
+                 icon: 'images/clock.png',
+                 itemId: 'realtime',
+                 disabled: true,
+                 cls: 'x-btn-icon',
+                 tooltip: 'Display real-time graph',
+                 handler: function () {
+                 }
+                 },
+                 { xtype: 'tbfill' },
+                 {
+                 icon: 'images/information-balloon.png',
+                 itemId: 'info',
+                 cls: 'x-btn-icon',
+                 disabled: true,
+                 tooltip: 'Display information on current graph',
+                 handler: function () {
+                 Ext.create('Ext.data.Store', {
+                 storeId: 'graphInfoStore',
+                 fields: ['name', 'value'],
+                 data: graphInfoItems
+                 });
+
+                 var graphInfoGrid = Ext.create('Ext.grid.Panel', {
+                 hideHeaders: true,
+                 store: Ext.data.StoreManager.lookup('graphInfoStore'),
+                 columns: [
+                 { text: 'Name', dataIndex: 'name', width: 250 },
+                 { text: 'Value', dataIndex: 'value', flex: 1 }
+                 ],
+                 disableSelection: true,
+                 viewConfig: {
+                 trackOver: false
+                 }
+                 });
+
+                 var grWin = Ext.create('Ext.Window', {
+                 title: 'Graph Information',
+                 width: 350,
+                 height: 300,
+                 modal: true,
+                 resizable: false,
+                 draggable: false,
+                 itemId: 'chartInfo',
+                 items: [graphInfoGrid]
+                 });
+
+                 grWin.show();
+                 grWin.alignTo(Ext.get("chartIsHere"), "tr-tr");
+                 }
+                 }*/
             ]
         });
 
         var highchartsPanel = Ext.create('Ext.panel.Panel', {
-            itemId:'chartPanel',
+            itemId: 'chartPanel',
             //TODO: Does this need to be 'id'?
-            id:'chartPanel',
-            xtype:'panel',
-            tbar:toolbar,
-            flex:1,
-            maintainFlex:true,
-            border:false,
-            layout:'fit',
-            items:[
+            id: 'chartPanel',
+            xtype: 'panel',
+            tbar: toolbar,
+            flex: 1,
+            maintainFlex: true,
+            border: false,
+            layout: 'fit',
+            items: [
                 {
-                    itemId:'chartIsHere',
-                    id:'chartIsHere',
-                    listeners:{
-                        resize:function (comp, width, height, oldWidth, oldHeight, eOpts) {
+                    itemId: 'chartIsHere',
+                    id: 'chartIsHere',
+                    listeners: {
+                        resize: function (comp, width, height, oldWidth, oldHeight, eOpts) {
                             if (this.chartObject != null) {
                                 this.chartObject.setSize(width, height);
                             }
@@ -569,8 +646,8 @@ Ext.define('openHAB.graph.graphHighcharts', {
 
         this.callParent();
 
-        this.chartUpdate = function (channels, start, stop) {
-            updateChart(channels, start, stop);
+        this.chartUpdate = function (newConfig, start, stop) {
+            updateChart(newConfig, start, stop);
         }
         this.getData = function () {
             return rawData;

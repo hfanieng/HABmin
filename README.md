@@ -1,3 +1,8 @@
+Updates
+-------
+* 20-01-2014: Added ability to save and restore charts. This allows considerable customisation of the graphs.
+
+
 Overview
 --------
 _HABmin_ is a web administration console for openHAB. It aims to provide a complete interface to administer openHAB, including the following features -:
@@ -33,7 +38,7 @@ While _HABmin_ is a supporting project to OpenHAB,  providing access to openHAB'
 
 ###Status
 The project is just getting started. Currently implemented are the following -:
-* Graphing of data from the persistence store
+* Graphing of data from the persistence store including saving and restoring charts.
 * Item editor
 * Sitemap editor
 * General binding configuration (ie binding configuration in the openhab.cfg file)
