@@ -44,6 +44,8 @@ Ext.define('openHAB.config.itemList', {
         this.title = language.config_ItemListTitle;
         this.tabTip = language.config_ItemListTitleTip;
 
+        var me = this;
+
         var toolbar = Ext.create('Ext.toolbar.Toolbar', {
             items: [
                 {
@@ -133,7 +135,16 @@ Ext.define('openHAB.config.itemList', {
                                     fieldLabel: language.config_ItemListModelName,
                                     itemId: 'model',
                                     name: 'model',
-                                    store: {model: 'ItemModelsModel', data: models},
+                                    store: {
+                                        model: 'ItemModelsModel',
+                                        data: models,
+                                        sorters: [
+                                            {
+                                                property: 'name',
+                                                direction: 'ASC'
+                                            }
+                                        ]
+                                    },
                                     allowBlank: false,
                                     valueField: 'name',
                                     displayField: 'name',
@@ -157,10 +168,8 @@ Ext.define('openHAB.config.itemList', {
                                             // Read the model name
                                             var model = form.getForm().findField('model').getSubmitValue();
 
-                                            var newProperties = null;
-
                                             // Create a new itemProperties
-                                            newProperties = Ext.create('openHAB.config.itemProperties');
+                                            var newProperties = Ext.create('openHAB.config.itemProperties');
                                             newProperties.createItem(model);
 
                                             if (newProperties != null)
@@ -211,6 +220,16 @@ Ext.define('openHAB.config.itemList', {
             tbar: toolbar,
             collapsible: false,
             multiSelect: false,
+            plugins: [
+                {
+                    ptype: 'grid',
+                    emptyText: language.config_ItemListFilterDefault
+                },
+                {
+                    ptype: 'cellediting',
+                    clicksToEdit: 1
+                }
+            ],
             columns: [
                 {
                     text: language.config_ItemListItem,

@@ -50,6 +50,13 @@ var language = {
     create: "Create",
 
     // app.js
+    translation_None: "None",
+    translation_MapFile: "Map File",
+    translation_Regex: "Regular Expression",
+    translation_Javascript: "JavaScript",
+    translation_Exec: "Exec",
+    translation_XLS: "XML Style Sheet",
+    translation_XPath: "XPath",
     mainTab_Persistence: "Persistence",
     mainTab_PersistenceTip: "Display chart page",
     mainTab_Configuration: "Configuration",
@@ -121,8 +128,10 @@ var language = {
     config_ItemListModel: "Model",
     config_ItemListDeleted: "Item '%s' has been deleted.",
     config_ItemListDeleteError: "Error deleting item '%s'.",
+    config_ItemListFilterDefault: "filter...",
 
     // config/itemProperties.js
+    config_ItemPropertiesTitleTip: "Item Properties",
     config_ItemPropertiesSetName: "Set the item name.",
     config_ItemPropertiesSetType: "Set the item type.",
     config_ItemPropertiesSetLabel: "Specify the default label used in the UI.",
@@ -143,6 +152,7 @@ var language = {
     config_ItemPropertiesSaveChangeTip: "Save changes to the item configuration",
     config_ItemPropertiesSaveOk: "Item configuration saved successfully",
     config_ItemPropertiesSaveError: "Error saving item configuration",
+    config_ItemPropertiesNothingSaved: "No changes detected. No updates have been made to the server.",
 
     // config/itemRules.js
     config_ItemRulesTitle: "Rules",
@@ -155,6 +165,17 @@ var language = {
     config_ItemRulesDescription: "Description",
     config_ItemRulesDeletedOk: "Rule '%s' successfully removed from item '%s'",
     config_ItemRulesDeletedError: "Error deleting rule '%s' from item '%s'",
+
+    // config/itemBindings.js
+    config_ItemBindingsTitle: "Bindings",
+    config_ItemBindingsDeleteTip: "Delete the item binding",
+    config_ItemBindingsAddTip: "Add a new item binding",
+    config_ItemBindingsNewBinding: "New Binding",
+    config_ItemBindingsBinding: "Binding",
+    config_ItemBindingsBinding: "Config",
+    config_ItemBindingsDefaultName: "Binding Name",
+    config_ItemBindingsDefaultString: "Binding String",
+    config_ItemBindingsUpdate: "Update data",
 
     // config/groupTree.js
     config_GroupsTitle: "Groups",
@@ -265,7 +286,7 @@ var language = {
     graph_ItemListUpdateTip: "Retrieve the currently selected channels",
     graph_ItemListSave: "Save Graph",
     graph_ItemListSaveTip: "Save current chart configuration",
-    graph_ItemListReset: "Reset Graph",
+    graph_ItemListReset: "Reset List",
     graph_ItemListResetTip: "Clear Selected Channels and Reset Period",
     graph_ItemTitle: "Item",
     graph_LastValue: "Last Value",

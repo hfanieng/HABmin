@@ -63,8 +63,8 @@ Ext.Loader.setConfig({
     'paths': {
         'Ext.ux': 'js/extux',
         'Ext.ux.window': 'js/extux/notification',
-        'Ext.ux.grid.property': 'js/extux/propertygrid',
         'Ext.ux.aceeditor': 'js/extux/aceeditor',
+        'Ext.ux.grid': 'js/extux/grid',
         'openHAB': 'app'
     }
 });
@@ -80,6 +80,7 @@ Ext.require([
     'Ext.selection.CellModel',
     'Ext.layout.container.Border',
     'Ext.layout.container.Accordion',
+    'Ext.ux.grid.QuickFilter',
     'Ext.ux.statusbar.StatusBar',
     'Ext.ux.aceeditor.Panel',
     'Ext.ux.window.Notification',
@@ -119,10 +120,11 @@ Ext.require([
 var viewPort;
 
 var statusTooltip;
+var STATUS_UNKNOWN = 0;
 var STATUS_ONLINE = 1;
 var STATUS_BUSY = 2;
 var STATUS_OFFLINE = 3;
-var onlineStatus = STATUS_OFFLINE;
+var onlineStatus = STATUS_UNKNOWN;
 
 var NOTIFICATION_ERROR = 1;
 var NOTIFICATION_OK = 2;
@@ -202,24 +204,25 @@ var formatLookupArray = [
 ];
 
 var translationServiceArray = [
-    {name: "MAP", label: "Map File"},
-    {name: "REGEX", label: "Regular Expression"},
-    {name: "JAVASCRIPT", label: "JavaScript"},
-    {name: "EXEC", label: "Exec"},
-    {name: "XSLT", label: "XML Style Sheet"},
-    {name: "XPATH", label: "XPath"}
+    {name: "", label: language.translation_None},
+    {name: "MAP", label: language.translation_MapFile},
+    {name: "REGEX", label: language.translation_Regex},
+    {name: "JAVASCRIPT", label:language.translation_Javascript},
+    {name: "EXEC", label: language.translation_Exec},
+    {name: "XSLT", label: language.translation_XLS},
+    {name: "XPATH", label: language.translation_XPath}
 ];
 
 var cronRuleArray = [
     {label: "Every 15 seconds", rule: "0/15 * * * * ?"},
     {label: "Every 30 seconds", rule: "0/30 * * * * ?"},
     {label: "Every 1 minute", rule: "0 * * * * ?"},
-    {label: "Every 2 minutes", rule: "0/2 * * * * ?"},
-    {label: "Every 5 minutes", rule: "0/5 * * * * ?"},
-    {label: "Every 10 minutes", rule: "0/10 * * * * ?"},
-    {label: "Every 15 minutes", rule: "0/15 * * * * ?"},
-    {label: "Every 20 minutes", rule: "0/20 * * * * ?"},
-    {label: "Every 30 minutes", rule: "0/30 * * * * ?"},
+    {label: "Every 2 minutes", rule: "0 0/2 * * * ?"},
+    {label: "Every 5 minutes", rule: "0 0/5 * * * ?"},
+    {label: "Every 10 minutes", rule: "0 0/10 * * * ?"},
+    {label: "Every 15 minutes", rule: "0 0/15 * * * ?"},
+    {label: "Every 20 minutes", rule: "0 0/20 * * * ?"},
+    {label: "Every 30 minutes", rule: "0 0/30 * * * ?"},
     {label: "Every 1 hour", rule: "0 0 * * * ?"},
     {label: "Every 2 hours", rule: "0 0 0/2 * * ?"},
     {label: "Every 3 hours", rule: "0 0 0/3 * * ?"},
@@ -404,26 +407,26 @@ function doStatus() {
                 success: function (response, opts) {
                     var res = Ext.decode(response.responseText);
                     if(res == null)
-                        this.statusCount++;
+                        updateStatus.statusCount++;
                     else
-                        this.statusCount = 0;
+                        updateStatus.statusCount = 0;
                 },
                 failure: function (response, opts) {
-                    this.statusCount++;
+                    updateStatus.statusCount++;
                 },
                 callback: function () {
                     // Hold off any errors until after the startup time.
                     // This is necessary for slower (embedded) machines
-                    if(this.startCnt > 0) {
-                        this.startCnt--;
+                    if(updateStatus.startCnt > 0) {
+                        updateStatus.startCnt--;
                     }
                     else {
-                        this.errorLimit = 2;
+                        updateStatus.errorLimit = 2;
                     }
 
-                    if(this.statusCount >= this.errorLimit)
+                    if(updateStatus.statusCount >= updateStatus.errorLimit)
                         handleOnlineStatus(STATUS_OFFLINE);
-                    else
+                    else if(updateStatus.statusCount == 0)
                         handleOnlineStatus(STATUS_ONLINE);
                 }
             });

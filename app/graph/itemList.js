@@ -49,7 +49,7 @@ Ext.define('openHAB.graph.itemList', {
         var itemToolbar = Ext.create('Ext.toolbar.Toolbar', {
             items: [
                 {
-                    icon: 'images/cross.png',
+                    icon: 'images/arrow-circle-225-left.png',
                     itemId: 'clear',
                     text: language.graph_ItemListReset,
                     cls: 'x-btn-icon',
@@ -57,6 +57,7 @@ Ext.define('openHAB.graph.itemList', {
                     tooltip: language.graph_ItemListResetTip,
                     handler: function () {
                         var selectedChanList = [];
+                        itemList.clearSelection();
                         itemToolbar.getComponent('update').disable();
                         itemToolbar.getComponent('save').disable();
 
