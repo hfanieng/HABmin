@@ -76,7 +76,7 @@ Ext.define('openHAB.graph.itemList', {
 
                         var saveGraph = Ext.create('openHAB.graph.saveGraph');
                         var config = createConfig();
-                        config.period = 86400;
+                        config.period = "86400";
                         saveGraph.setData(config);
                         saveGraph.show();
                     }
@@ -103,6 +103,16 @@ Ext.define('openHAB.graph.itemList', {
             tbar: itemToolbar,
             header: false,
             disableSelection: true,
+            plugins: [
+                {
+                    ptype: 'grid',
+                    emptyText: language.graph_ItemListFilterDefault
+                },
+                {
+                    ptype: 'cellediting',
+                    clicksToEdit: 1
+                }
+            ],
             columns: [
                 {
                     menuDisabled: true,
@@ -118,19 +128,21 @@ Ext.define('openHAB.graph.itemList', {
                     }
                 },
                 {
+                    text: language.graph_ItemName,
+                    hideable: true,
+                    flex: 1,
+                    hidden: true,
+                    width: 75,
+                    sortable: true,
+                    dataIndex: 'name'
+                },
+                {
                     text: language.graph_ItemTitle,
-                    hideable: false,
+                    hideable: true,
                     flex: 1,
                     width: 75,
                     sortable: true,
-                    dataIndex: 'label',
-                    renderer: function (value, metaData, record, row, col, store, gridView) {
-                        if (value != "")
-                            return value;
-                        if (record == null)
-                            return "";
-                        return record.get('name');
-                    }
+                    dataIndex: 'label'
                 },
                 {
                     text: language.graph_LastValue,
@@ -232,6 +244,7 @@ Ext.define('openHAB.graph.itemList', {
                 newItem.item = selectedItemList[cnt].name;
                 newItem.axis = 1;
                 newItem.legend = true;
+                newItem.lineWidth = 1;
 
                 var ref = persistenceItemStore.findExact("name", selectedItemList[cnt].name);
                 if (ref != -1)

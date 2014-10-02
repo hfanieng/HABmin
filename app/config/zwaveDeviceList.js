@@ -54,7 +54,7 @@ Ext.define('openHAB.config.zwaveDeviceList', {
 
             if (!node.hasChildNodes()) {
                 return [];
-            } else if(node.isVisible()) {
+            } else if (node.isVisible()) {
                 allNodes.push(node.get("domain"));
                 node.eachChild(function (Mynode) {
                     allNodes = allNodes.concat(getChildLeafNodes(Mynode));
@@ -80,7 +80,71 @@ Ext.define('openHAB.config.zwaveDeviceList', {
                         // Reload the store
                         store.reload();
                     }
-                }
+                },
+                {
+                    icon: 'images/bandaid--arrow.png',
+                    itemId: 'heal-all',
+                    text: language.zwave_DevicesHealButton,
+                    cls: 'x-btn-icon',
+                    disabled: false,
+                    tooltip: language.zwave_DevicesHealButtonTip,
+                    handler: function () {
+                        Ext.Ajax.request({
+                            url: HABminBaseURL + '/zwave/action/binding/network/',
+                            method: 'PUT',
+                            jsonData: 'Heal',
+                            headers: {'Accept': 'application/json'},
+                            success: function (response, opts) {
+                            },
+                            failure: function () {
+                                handleStatusNotification(NOTIFICATION_ERROR, language.zwave_DevicesActionError);
+                            }
+                        });
+                    }
+                },
+                {
+                    icon: 'images/wrench--plus.png',
+                    itemId: 'include',
+                    text: language.zwave_DevicesIncludeButton,
+                    cls: 'x-btn-icon',
+                    disabled: false,
+                    tooltip: language.zwave_DevicesIncludeButtonTip,
+                    handler: function () {
+                        Ext.Ajax.request({
+                            url: HABminBaseURL + '/zwave/action/binding/network/',
+                            method: 'PUT',
+                            jsonData: 'Include',
+                            headers: {'Accept': 'application/json'},
+                            success: function (response, opts) {
+                            },
+                            failure: function () {
+                                handleStatusNotification(NOTIFICATION_ERROR, language.zwave_DevicesActionError);
+                            }
+                        });
+                    }
+                },
+                {
+                    icon: 'images/wrench--minus.png',
+                    itemId: 'exclude',
+                    text: language.zwave_DevicesExcludeButton,
+                    cls: 'x-btn-icon',
+                    disabled: false,
+                    tooltip: language.zwave_DevicesExcludeButtonTip,
+                    handler: function () {
+                        Ext.Ajax.request({
+                            url: HABminBaseURL + '/zwave/action/binding/network/',
+                            method: 'PUT',
+                            jsonData: 'Exclude',
+                            headers: {'Accept': 'application/json'},
+                            success: function (response, opts) {
+                            },
+                            failure: function () {
+                                handleStatusNotification(NOTIFICATION_ERROR, language.zwave_DevicesActionError);
+                            }
+                        });
+                    }
+                },
+                '-'
             ]
         });
 
@@ -153,7 +217,6 @@ Ext.define('openHAB.config.zwaveDeviceList', {
                     }
                 }
             },
-            flex: 1,
             header: false,
             split: true,
             tbar: toolbar,
@@ -184,7 +247,9 @@ Ext.define('openHAB.config.zwaveDeviceList', {
                             // Check that the value is within limits
                             var limitError = false;
                             if (limitError == true) {
-                                handleStatusNotification(NOTIFICATION_WARNING, sprintf(language.zwave_DevicesValueUpdateRangeError, e.record.get('minimum'), e.record.get('maximum')));
+                                handleStatusNotification(NOTIFICATION_WARNING,
+                                    sprintf(language.zwave_DevicesValueUpdateRangeError, e.record.get('minimum'),
+                                        e.record.get('maximum')));
                                 return;
                             }
 
@@ -198,7 +263,8 @@ Ext.define('openHAB.config.zwaveDeviceList', {
                                 success: function (response, opts) {
                                 },
                                 failure: function () {
-                                    handleStatusNotification(NOTIFICATION_ERROR, language.zwave_DevicesValueUpdateError);
+                                    handleStatusNotification(NOTIFICATION_ERROR,
+                                        language.zwave_DevicesValueUpdateError);
                                 }
                             });
                         }
@@ -223,20 +289,20 @@ Ext.define('openHAB.config.zwaveDeviceList', {
                         var img = "";
                         switch (record.get('state')) {
                             case 'OK':
-                                img = '<img height="12" src="images/status.png">';
+                                meta.tdCls = 'grid-ok';
                                 break;
                             case 'WARNING':
-                                img = '<img height="12" src="images/status-away.png">';
+                                meta.tdCls = 'grid-warning';
                                 break;
                             case 'ERROR':
-                                img = '<img height="12" src="images/status-busy.png">';
+                                meta.tdCls = 'grid-error';
                                 break;
                             case 'INITIALIZING':
-                                img = '<img height="12" src="images/status-offline.png">';
+                                meta.tdCls = 'grid-initializing';
                                 break;
                         }
 
-                        return '<span>' + value + '</span><span style="float:right">' + img + '</span>';
+                        return value;
                     }
                 },
                 {
@@ -246,6 +312,10 @@ Ext.define('openHAB.config.zwaveDeviceList', {
                     renderer: function (value, meta, record) {
                         if (value == "")
                             return "";
+
+                        // If the status is PENDING, then mark it so...
+                        if (record.get('state') == "PENDING")
+                            meta.style = 'background-color: #FDFD96;border-radius: 8px;';
 
                         // If this is a list, then we want to display the value, not the number!
                         var type = record.get('type');
@@ -309,7 +379,7 @@ Ext.define('openHAB.config.zwaveDeviceList', {
             listeners: {
                 select: function (grid, record, index, eOpts) {
                     // Remove all current action buttons
-                    for (var cnt = 1; cnt < toolbar.items.length; cnt++) {
+                    for (var cnt = toolbar.items.length; cnt >= 5; cnt--) {
                         toolbar.remove(toolbar.items.get(cnt), true);
                     }
 
@@ -328,35 +398,36 @@ Ext.define('openHAB.config.zwaveDeviceList', {
                     var name = record.get("name");
 
                     // Add any actions for the selected item
-//                    for (var cnt = 0; cnt < actions.length; cnt++) {
-                    var x = {
-//                            itemId:"action" + 0,
-                        icon: 'images/gear.png',
-                        cls: 'x-btn-icon',
-                        text: actions[0].value,
-                        handler: function () {
-                            var data = {};
-                            data.action = actions[0].key;
-//                                data.name = name;
-                            Ext.Ajax.request({
-                                url: HABminBaseURL + '/zwave/action/' + domain,
-                                method: 'PUT',
-                                jsonData: actions[0].key,
-                                headers: {'Accept': 'application/json'},
-                                success: function (response, opts) {
-                                },
-                                failure: function () {
-                                    handleStatusNotification(NOTIFICATION_ERROR, language.zwave_DevicesActionError);
-                                }
-                            });
-                        }
-                    };
+                    for (var cnt = 0; cnt < actions.length; cnt++) {
+                        var x = {
+                            itemId: "action" + cnt,
+                            icon: 'images/gear-small.png',
+                            cls: 'x-btn-icon',
+                            text: actions[cnt].value,
+                            handler: function () {
+                                var data = {};
+                                var ref = this.itemId.substring(6);
+                                data.action = actions[ref].key;
+                                data.name = name;
+                                Ext.Ajax.request({
+                                    url: HABminBaseURL + '/zwave/action/' + domain,
+                                    method: 'PUT',
+                                    jsonData: actions[ref].key,
+                                    headers: {'Accept': 'application/json'},
+                                    success: function (response, opts) {
+                                    },
+                                    failure: function () {
+                                        handleStatusNotification(NOTIFICATION_ERROR, language.zwave_DevicesActionError);
+                                    }
+                                });
+                            }
+                        };
 
-                    toolbar.add(x);
-//                     }
+                        toolbar.add(x);
+                    }
 
                     // Get the node ID
-                    var nodeName;
+ //                   var nodeName;
                 },
                 afteritemexpand: function (node, index, item, eOpts) {
                     // Get a list of all children nodes
@@ -393,6 +464,7 @@ Ext.define('openHAB.config.zwaveDeviceList', {
                     type: 'rest',
                     url: HABminBaseURL + '/zwave/' + this.nodePollingTable[cnt],
                     method: 'GET',
+                    timeout: 3500,
                     success: function (response, opts) {
                         var res = Ext.decode(response.responseText);
                         if (res == null || res.records == null)
@@ -416,7 +488,7 @@ Ext.define('openHAB.config.zwaveDeviceList', {
                 });
             }
         },
-        interval: 1500
+        interval: 5000
     },
     listeners: {
         beforeshow: function (grid, eOpts) {

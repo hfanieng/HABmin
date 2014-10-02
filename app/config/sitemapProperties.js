@@ -43,6 +43,8 @@ Ext.define('openHAB.config.sitemapProperties', {
     initComponent: function () {
         this.tabTip = language.config_SitemapPropertiesTip;
 
+        var me = this;
+
         // Note that "itemicon" is used for the model to avoid upsetting the icon in the treeview
         // ExtJS uses the keyword "icon" to allow the user to set the icon in the tree!
         var widgetConfig = {
@@ -80,7 +82,7 @@ Ext.define('openHAB.config.sitemapProperties', {
         };
 
         // Array of widget types that are allowed to have children
-        var linkableWidgets = ["Sitemap", "Group", "Text", "Image", "Frame"];
+        var linkableWidgets = ["sitemap", "Group", "Text", "Image", "Frame"];
 
         var widgetHelp = {
             command: "?",
@@ -343,6 +345,36 @@ Ext.define('openHAB.config.sitemapProperties', {
             folderSort: true
         });
 
+        var toolbar = Ext.create('Ext.toolbar.Toolbar', {
+            itemId: "toolbar",
+            items: [
+                {
+                    icon: 'images/cross.png',
+                    itemId: 'cancel',
+                    text: language.cancel,
+                    cls: 'x-btn-icon',
+                    disabled: true,
+                    tooltip: language.config_ItemPropertiesCancelChangeTip,
+                    handler: function () {
+                        // Reset to the current data
+                        me.revertSitemap();
+                    }
+                },
+                {
+                    icon: 'images/disk.png',
+                    itemId: 'save',
+                    text: language.save,
+                    cls: 'x-btn-icon',
+                    disabled: true,
+                    tooltip: language.config_SitemapPropertiesSave,
+                    handler: function () {
+                        me.saveSitemap();
+                    }
+                }
+            ]
+        });
+
+
         var propertySheet = Ext.create('Ext.grid.property.Grid', {
             title: language.properties,
             icon: 'images/gear.png',
@@ -378,7 +410,7 @@ Ext.define('openHAB.config.sitemapProperties', {
                                     if (map != null) {
                                         for (var mcnt = 0; mcnt < map.length; mcnt++) {
                                             var segment = map[mcnt].split("=");
-                                            if (segment == null)
+                                            if (segment == null || segment.length != 2)
                                                 continue;
                                             val[ocnt] = {};
                                             val[ocnt].command = segment[0].trim();
@@ -394,6 +426,9 @@ Ext.define('openHAB.config.sitemapProperties', {
 
                         // Disable the save button
                         propertySheet.getHeader().getTools()[0].disable();
+                        
+                        toolbar.getComponent('cancel').enable();
+                        toolbar.getComponent('save').enable();
 
                         // Function to get a property value given the name
                         // Returns null if property not found
@@ -505,96 +540,6 @@ Ext.define('openHAB.config.sitemapProperties', {
                     handler: function (event, toolEl, panel) {
                         sitemapTree.expandAll();
                     }
-                },
-                {
-                    type: 'disk',
-                    tooltip: language.config_SitemapPropertiesSave,
-                    handler: function (event, toolEl, panel) {
-                        // Make sure we're loaded!
-                        if (sitemapName == null)
-                            return;
-
-                        var root = sitemapTree.getRootNode();
-                        var jsonArray = {};
-
-                        jsonArray.name = sitemapName;
-                        // Iterate through the store to generate the sitemap
-                        var errors = [];
-                        jsonArray.widget = iterateStore(root, 0);
-
-                        // Check if errors were detected in the sitemap definition
-                        // If so, notify and wait for them to be fixed!
-                        if (errors.length != 0) {
-                            var message = 'Errors exist in the sitemap definition -:';
-                            for (var cnt = 0; cnt < errors.length; cnt++)
-                                message += "<br>" + errors[cnt];
-
-                            handleStatusNotification(NOTIFICATION_ERROR, message);
-
-                            return;
-                        }
-
-                        // Send the sitemap to openHAB
-                        Ext.Ajax.request({
-                            url: HABminBaseURL + "/config/sitemap/" + sitemapName,
-                            headers: {'Accept': 'application/json'},
-                            method: 'PUT',
-                            jsonData: jsonArray,
-                            success: function (response, opts) {
-                                handleStatusNotification(NOTIFICATION_OK, language.config_SitemapPropertiesSaveOk);
-                                sitemapItemStore.sync();
-                            },
-                            failure: function (result, request) {
-                                handleStatusNotification(NOTIFICATION_ERROR, language.config_SitemapPropertiesSaveErr);
-                            }
-                        });
-
-                        function iterateStore(node, iterateCnt) {
-                            iterateCnt++;
-                            if (iterateCnt >= 9)
-                                return;
-
-                            // Valid widget?
-                            var properties = widgetConfig[node.get("type")];
-                            if (properties == null)
-                                return;
-
-                            // Get the widget properties
-                            var newNode = {};
-                            newNode.type = node.get('type');
-                            for (var pcnt = 0; pcnt < properties.length; pcnt++) {
-                                var property = properties[pcnt];
-                                if (configTranslate[properties[pcnt]] != null)
-                                    property = configTranslate[properties[pcnt]];
-                                newNode[property] = node.get(properties[pcnt]);
-                            }
-
-                            // Check for children
-                            if (node.hasChildNodes()) {
-                                newNode.widget = [];
-                                for (var cnt = 0; cnt < 1000; cnt++) {
-                                    var child = node.getChildAt(cnt);
-                                    if (child == null)
-                                        break;
-
-                                    newNode.widget.push(iterateStore(child, iterateCnt));
-                                }
-                            }
-                            else {
-                                if (newNode.type == "Frame") {
-                                    var label = "No Label";
-                                    if (newNode.label && newNode.label.length)
-                                        label = newNode.label;
-                                    addError(sprintf(language.config_SitemapPropertiesFrameErr, label));
-                                }
-                            }
-                            return newNode;
-                        }
-
-                        function addError(error) {
-                            errors.push(error);
-                        }
-                    }
                 }
             ],
             rootVisible: true,
@@ -616,6 +561,11 @@ Ext.define('openHAB.config.sitemapProperties', {
                         // Most of this is done automatically based on store names
                         var record = data.records[0];
                         record.set('icon', '');
+
+                        toolbar.getComponent('cancel').enable();
+                        toolbar.getComponent('save').enable();
+
+                        showWidgetProperties(record);
                     },
                     nodedragover: function (targetNode, position, dragData, e, eOpts) {
                         // Make sure we can only append to groups and frames
@@ -624,6 +574,10 @@ Ext.define('openHAB.config.sitemapProperties', {
                                 return true;
                             return false
                         }
+                    },
+                    itemadd: function( records, index, node, eOpts ) {
+                        sitemapTree.getSelectionModel().deselectAll(true);
+                        sitemapTree.getSelectionModel().select(node, true);
                     }
                 }
             },
@@ -683,8 +637,10 @@ Ext.define('openHAB.config.sitemapProperties', {
             ],
             listeners: {
                 itemclick: function (grid, record, item, index, element, eOpts) {
-                    // ToDo: We really should check if the properties are dirty and warn the user before setting the new values
                     showWidgetProperties(record);
+                },
+                itemappend: function(panel, node, index, eOpts) {
+                    sitemapTree.getSelectionModel().select(node, true);
                 }
             }
         });
@@ -695,6 +651,7 @@ Ext.define('openHAB.config.sitemapProperties', {
         var sitemapDesign = Ext.create('Ext.panel.Panel', {
             itemId: 'sitemapPanel',
             title: language.properties,
+            tbar: toolbar,
             icon: 'images/maps-stack.png',
             defaults: {
                 split: true
@@ -717,6 +674,7 @@ Ext.define('openHAB.config.sitemapProperties', {
 
         this.callParent();
 
+        // Set the item properties. This is called just after the properties window is created.
         this.setItem = function (newSitemap) {
             Ext.Ajax.request({
                 url: HABminBaseURL + "/config/sitemap/" + newSitemap,
@@ -812,10 +770,15 @@ Ext.define('openHAB.config.sitemapProperties', {
             // Disable the buttons
             propertySheet.getHeader().getTools()[0].disable();
             propertySheet.getHeader().getTools()[1].disable();
+
+            toolbar.getComponent('cancel').enable();
+            toolbar.getComponent('save').enable();
         }
 
         // Show the selected widgets properties in the property grid
         function showWidgetProperties(widget) {
+            // ToDo: We really should check if the properties are dirty and warn the user before setting the new values
+
             var source = [];
             var properties = widgetConfig[widget.get("type")];
             // Valid widget?
@@ -857,6 +820,98 @@ Ext.define('openHAB.config.sitemapProperties', {
 
             // Enable delete button
             propertySheet.getHeader().getTools()[1].enable();
+        }
+
+        this.saveSitemap = function () {
+            // Make sure we're loaded!
+            if (sitemapName == null)
+                return;
+
+            var root = sitemapTree.getRootNode();
+            var jsonArray = {};
+
+            jsonArray.name = sitemapName;
+            // Iterate through the store to generate the sitemap
+            var errors = [];
+            jsonArray.widget = iterateStore(root, 0);
+
+            // Check if errors were detected in the sitemap definition
+            // If so, notify and wait for them to be fixed!
+            if (errors.length != 0) {
+                var message = 'Errors exist in the sitemap definition -:';
+                for (var cnt = 0; cnt < errors.length; cnt++)
+                    message += "<br>" + errors[cnt];
+
+                handleStatusNotification(NOTIFICATION_ERROR, message);
+                return;
+            }
+
+            // Send the sitemap to openHAB
+            Ext.Ajax.request({
+                url: HABminBaseURL + "/config/sitemap/" + sitemapName,
+                headers: {'Accept': 'application/json'},
+                method: 'PUT',
+                jsonData: jsonArray,
+                success: function (response, opts) {
+                    handleStatusNotification(NOTIFICATION_OK, language.config_SitemapPropertiesSaveOk);
+                    sitemapItemStore.sync();
+                    toolbar.getComponent('cancel').disable();
+                    toolbar.getComponent('save').disable();
+                },
+                failure: function (result, request) {
+                    handleStatusNotification(NOTIFICATION_ERROR, language.config_SitemapPropertiesSaveErr);
+                }
+            });
+
+            function iterateStore(node, iterateCnt) {
+                iterateCnt++;
+                if (iterateCnt >= 9)
+                    return;
+
+                // Valid widget?
+                var properties = widgetConfig[node.get("type")];
+                if (properties == null)
+                    return;
+
+                // Get the widget properties
+                var newNode = {};
+                newNode.type = node.get('type');
+                for (var pcnt = 0; pcnt < properties.length; pcnt++) {
+                    var property = properties[pcnt];
+                    if (configTranslate[properties[pcnt]] != null)
+                        property = configTranslate[properties[pcnt]];
+                    newNode[property] = node.get(properties[pcnt]);
+                }
+
+                // Check for children
+                if (node.hasChildNodes()) {
+                    newNode.widget = [];
+                    for (var cnt = 0; cnt < 1000; cnt++) {
+                        var child = node.getChildAt(cnt);
+                        if (child == null)
+                            break;
+
+                        newNode.widget.push(iterateStore(child, iterateCnt));
+                    }
+                }
+                else {
+                    if (newNode.type == "Frame") {
+                        var label = "No Label";
+                        if (newNode.label && newNode.label.length)
+                            label = newNode.label;
+                        addError(sprintf(language.config_SitemapPropertiesFrameErr, label));
+                    }
+                }
+                return newNode;
+            }
+
+            function addError(error) {
+                errors.push(error);
+            }
+        }
+
+        this.revertSitemap = function () {
+
         }
     }
 })

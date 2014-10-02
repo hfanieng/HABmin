@@ -39,19 +39,26 @@
  * Load the language file before the application starts
  */
 var languageCode;
-document.ready=function() {
+document.ready = function () {
+    // Write the version to the splash-screen
+    Ext.fly('HABminVersion').update(versionGUI, false);
+
     // Detect the language and get the two character code
     languageCode = Ext.util.Cookies.get("language");
-    if(languageCode === null)
+    if (languageCode === null)
         languageCode = "en";
-    else if(isoLanguageGetName(languageCode) == "UNKNOWN")
+    else if (isoLanguageGetName(languageCode) == "UNKNOWN")
         languageCode = "en";
+
+    persistenceService = Ext.util.Cookies.get("persistence");
+    if(persistenceService == null)
+        persistenceService = "";
 
     // Write the language on the splash-screen
     Ext.fly('HABminLanguage').update(isoLanguageGetName(languageCode), false);
 
     // Only try and load languages that aren't English since this is the base
-    if(languageCode != "en")
+    if (languageCode != "en")
         loadLanguage(languageCode);
 };
 
@@ -64,6 +71,7 @@ Ext.Loader.setConfig({
         'Ext.ux': 'js/extux',
         'Ext.ux.window': 'js/extux/notification',
         'Ext.ux.aceeditor': 'js/extux/aceeditor',
+        'Ext.ux.blockly': 'js/extux/blockly',
         'Ext.ux.grid': 'js/extux/grid',
         'openHAB': 'app'
     }
@@ -83,39 +91,18 @@ Ext.require([
     'Ext.ux.grid.QuickFilter',
     'Ext.ux.statusbar.StatusBar',
     'Ext.ux.aceeditor.Panel',
+    'Ext.ux.blockly.Blockly',
     'Ext.ux.window.Notification',
-    'openHAB.graph.graph',
-    'openHAB.graph.saveGraph',
-    'openHAB.graph.itemList',
-    'openHAB.graph.graphList',
-    'openHAB.graph.graphTable',
-    'openHAB.graph.graphHighcharts',
-    'openHAB.config.config',
-    'openHAB.config.bindingList',
-    'openHAB.config.bindingProperties',
-    'openHAB.config.groupTree',
-    'openHAB.config.itemBindings',
-    'openHAB.config.itemList',
-    'openHAB.config.itemProperties',
-    'openHAB.config.itemRules',
-    'openHAB.config.mappingList',
-    'openHAB.config.mappingProperties',
-    'openHAB.config.sitemapList',
-    'openHAB.config.sitemapTheme',
-    'openHAB.config.zwaveDeviceList',
-    'openHAB.config.zwaveProductList',
-    'openHAB.config.zwaveNetwork',
-    'openHAB.config.sitemapProperties',
-    'openHAB.system.system',
-    'openHAB.system.logViewer',
-    'openHAB.system.systemBundles',
-    'openHAB.automation.automation',
-    'openHAB.automation.notificationList',
-    'openHAB.automation.ruleList',
-    'openHAB.automation.ruleLibrary',
-    'openHAB.automation.ruleProperties'
-    ]
+    'openHAB.graph.*',
+    'openHAB.config.*',
+    'openHAB.system.*',
+    'openHAB.automation.*'
+]
 );
+
+var versionGUI = "0.1.3-snapshot";
+var versionJAR;
+var gitRepoLink = "https://api.github.com/repos/cdjackson/HABmin/releases";
 
 var viewPort;
 
@@ -129,6 +116,7 @@ var onlineStatus = STATUS_UNKNOWN;
 var NOTIFICATION_ERROR = 1;
 var NOTIFICATION_OK = 2;
 var NOTIFICATION_WARNING = 3;
+var NOTIFICATION_INFO = 4;
 
 // Global data stores from openHAB
 var persistenceItemStore;
@@ -142,6 +130,7 @@ var itemConfigStore;
 var itemFormatStore;
 var translationServiceStore;
 var ruleLibraryStore;
+var designStore;
 var ruleStore;
 var cronRuleStore;
 var chartStore;
@@ -161,7 +150,7 @@ var itemTypeArray = [
     {name: "ContactItem", icon: "images/door-open.png"},
     {name: "DateTimeItem", icon: "images/clock.png"},
     {name: "DimmerItem", icon: "images/ui-slider.png"},
-    {name: "RollerShutterItem", icon: "images/curtain.png"},
+    {name: "RollershutterItem", icon: "images/curtain.png"},
     {name: "StringItem", icon: "images/edit.png"}
 ];
 
@@ -207,7 +196,7 @@ var translationServiceArray = [
     {name: "", label: language.translation_None},
     {name: "MAP", label: language.translation_MapFile},
     {name: "REGEX", label: language.translation_Regex},
-    {name: "JAVASCRIPT", label:language.translation_Javascript},
+    {name: "JAVASCRIPT", label: language.translation_Javascript},
     {name: "EXEC", label: language.translation_Exec},
     {name: "XSLT", label: language.translation_XLS},
     {name: "XPATH", label: language.translation_XPath}
@@ -245,18 +234,37 @@ Ext.application({
 });
 
 /**
- * Set default json headers
+ * Set default Ajax handlers
+ * Here we also want to keep a running count of outstanding request
+ * and the time since the last complete response so we can keep up
+ * with the server status
  */
 Ext.Ajax.defaultHeaders = {
     'Accept': 'application/json,application/xml',
     'Content-Type': 'application/json'
 };
 
+var ajaxOutstandingRequestCount = 0;
+var ajaxLastSuccess;
+Ext.Ajax.on('beforerequest', function (conn, options, eOpts) {
+    ajaxOutstandingRequestCount++;
+});
+Ext.Ajax.on('requestcomplete', function (conn, response, options, eOpts) {
+    ajaxOutstandingRequestCount--;
+    ajaxLastSuccess = (new Date()).getTime();
+
+});
+Ext.Ajax.on('requestexception', function (conn, response, options, eOpts) {
+    ajaxOutstandingRequestCount--;
+});
+
 /**
  * Load a country language file
  * @param countryCode the two digit ISO country code
  */
 function loadLanguage(countryCode) {
+    moment.lang(countryCode);
+
     Ext.Ajax.request({
         url: "./app/language/" + countryCode + ".json",
         headers: {'Accept': 'application/json'},
@@ -264,7 +272,7 @@ function loadLanguage(countryCode) {
         success: function (response, opts) {
             var json = Ext.decode(response.responseText);
 
-            if(json === null)
+            if (json === null)
                 return;
 
             for (var attrname in json) {
@@ -276,36 +284,99 @@ function loadLanguage(countryCode) {
     });
 }
 
+function getReleaseVersion() {
+    Ext.data.JsonP.request({
+        url: gitRepoLink,
+        callbackKey: 'callback',
+        success: function (result) {
+            if (result == null)
+                return;
+            if (result.data == null)
+                return;
+
+            // Find the latest version(s)
+            var currentReleaseTime = 0;
+            var newestReleaseTime = 0;
+            var newestReleaseVersion = "";
+            var newestPrereleaseTime = 0;
+            var newestPrereleaseVersion = "";
+            for (var cnt = 0; cnt < result.data.length; cnt++) {
+                // Ignore drafts
+                if (result.data[cnt].draft === true)
+                    continue;
+
+                // Find the time on the current version
+                if(result.data[cnt].tag_name == versionGUI)
+                    currentReleaseTime = Date.parse(result.data[cnt].published_at);
+
+                // Find the latest prerelease and release versions
+                if (result.data[cnt].prerelease === false) {
+                    if (Date.parse(result.data[cnt].published_at) > newestReleaseTime) {
+                        newestReleaseTime = result.data[cnt].published_at;
+                        newestReleaseVersion = result.data[cnt].tag_name;
+                    }
+                }
+                else {
+                    if (Date.parse(result.data[cnt].published_at) > newestPrereleaseTime) {
+                        newestPrereleaseTime = Date.parse(result.data[cnt].published_at);
+                        newestPrereleaseVersion = result.data[cnt].tag_name;
+                    }
+                }
+            }
+
+            // Get the time of the last pre-release notification
+            // We don't want to notify our users too often!
+            var lastPrereleaseCheck = Ext.util.Cookies.get("lastPrereleaseNotification");
+            if(lastPrereleaseCheck == null)
+                lastPrereleaseCheck = 0;
+
+            // Check if we have a new release
+            if(newestReleaseTime > currentReleaseTime) {
+                var notification = sprintf(language.newReleaseNotification, newestPrereleaseVersion, moment(newestPrereleaseTime).format("D MMM"));
+                handleStatusNotification(NOTIFICATION_INFO, notification);
+            }
+            else if(lastPrereleaseCheck < (new Date()).getTime() - (5 * 86400000)) {
+                if(newestPrereleaseTime > currentReleaseTime) {
+                    var notification = sprintf(language.newPrereleaseNotification, newestPrereleaseVersion, moment(newestPrereleaseTime).format("D MMM YYYY"));
+                    handleStatusNotification(NOTIFICATION_INFO, notification);
+
+                    var lastPrereleaseCheck = Ext.util.Cookies.set("lastPrereleaseNotification", (new Date()).getTime());
+                }
+            }
+        }
+    });
+}
+
 /**
  * Handle user preferences
  * This ensures that all required preferences are set, and are valid
  */
 function checkUserPrefs() {
-    if(userPrefs === null)
+    if (userPrefs === null)
         userPrefs = {};
 
     // Time to show error message
-    if(userPrefs.messageTimeError === null)
+    if (userPrefs.messageTimeError === null)
         userPrefs.messageTimeError = 2500;
-    if(userPrefs.messageTimeError > 10000)
+    if (userPrefs.messageTimeError > 10000)
         userPrefs.messageTimeError = 2500;
-    if(userPrefs.messageTimeError < 0)
+    if (userPrefs.messageTimeError < 0)
         userPrefs.messageTimeError = 2500;
 
     // Time to show warning message
-    if(userPrefs.messageTimeWarning === null)
+    if (userPrefs.messageTimeWarning === null)
         userPrefs.messageTimeWarning = 2500;
-    if(userPrefs.messageTimeWarning > 10000)
+    if (userPrefs.messageTimeWarning > 10000)
         userPrefs.messageTimeWarning = 2500;
-    if(userPrefs.messageTimeWarning < 0)
+    if (userPrefs.messageTimeWarning < 0)
         userPrefs.messageTimeWarning = 2500;
 
     // Time to show ok message
-    if(userPrefs.messageTimeSuccess === null)
+    if (userPrefs.messageTimeSuccess === null)
         userPrefs.messageTimeSuccess = 1500;
-    if(userPrefs.messageTimeSuccess > 10000)
+    if (userPrefs.messageTimeSuccess > 10000)
         userPrefs.messageTimeSuccess = 1500;
-    if(userPrefs.messageTimeSuccess < 0)
+    if (userPrefs.messageTimeSuccess < 0)
         userPrefs.messageTimeSuccess = 1500;
 }
 
@@ -316,7 +387,25 @@ function checkUserPrefs() {
  * @param message
  */
 function handleStatusNotification(type, message) {
-    if(type == NOTIFICATION_ERROR) {
+    if (type == NOTIFICATION_OK) {
+        Ext.create('widget.uxNotification', {
+            position: 'tr',
+            useXAxis: false,
+            cls: 'ux-notification-success',
+            iconCls: 'ux-notification-success-icon',
+            closable: false,
+            title: language.success,
+            html: message,
+            slideInDuration: 800,
+            slideBackDuration: 1500,
+            autoCloseDelay: 3000,
+            width: 250,
+            height: 75,
+            slideInAnimation: 'bounceOut',
+            slideBackAnimation: 'easeIn'
+        }).show();
+    }
+    else if (type == NOTIFICATION_ERROR) {
         Ext.create('widget.uxNotification', {
             position: 'tr',
             useXAxis: false,
@@ -334,7 +423,7 @@ function handleStatusNotification(type, message) {
             slideBackAnimation: 'easeIn'
         }).show();
     }
-    else if(type == NOTIFICATION_WARNING) {
+    else if (type == NOTIFICATION_WARNING) {
         Ext.create('widget.uxNotification', {
             position: 'tr',
             useXAxis: false,
@@ -356,14 +445,14 @@ function handleStatusNotification(type, message) {
         Ext.create('widget.uxNotification', {
             position: 'tr',
             useXAxis: false,
-            cls: 'ux-notification-success',
-            iconCls: 'ux-notification-success-icon',
+            cls: 'ux-notification-info',
+            iconCls: 'ux-notification-info-icon',
             closable: false,
-            title: language.success,
+            title: language.information,
             html: message,
             slideInDuration: 800,
             slideBackDuration: 1500,
-            autoCloseDelay: 3000,
+            autoCloseDelay: 6000,
             width: 250,
             height: 75,
             slideInAnimation: 'bounceOut',
@@ -374,7 +463,7 @@ function handleStatusNotification(type, message) {
 
 function handleOnlineStatus(newStatus) {
     // Don't do anything if the status hasn't changed
-    if(onlineStatus == newStatus)
+    if (onlineStatus == newStatus)
         return;
     onlineStatus = newStatus;
 
@@ -399,39 +488,48 @@ function doStatus() {
     // Periodically retrieve the openHAB server status updates
     var updateStatus = {
         run: function () {
-            Ext.Ajax.request({
-                type:'rest',
-                url:HABminBaseURL + '/status',
-                timeout: 2500,
-                method: 'GET',
-                success: function (response, opts) {
-                    var res = Ext.decode(response.responseText);
-                    if(res == null)
+            // Hold off on the status requests if we have requests outstanding.
+            if((ajaxLastSuccess < (new Date()).getTime() - 2500) && ajaxOutstandingRequestCount == 0) {
+                console.log("Request Status");
+                Ext.Ajax.request({
+                    type: 'rest',
+                    url: HABminBaseURL + '/status',
+                    timeout: updateStatus.timeout,
+                    method: 'GET',
+                    success: function (response, opts) {
+                        var res = Ext.decode(response.responseText);
+                        if (res == null)
+                            updateStatus.statusCount++;
+                        else
+                            updateStatus.statusCount = 0;
+                    },
+                    failure: function (response, opts) {
                         updateStatus.statusCount++;
-                    else
-                        updateStatus.statusCount = 0;
-                },
-                failure: function (response, opts) {
-                    updateStatus.statusCount++;
-                },
-                callback: function () {
-                    // Hold off any errors until after the startup time.
-                    // This is necessary for slower (embedded) machines
-                    if(updateStatus.startCnt > 0) {
-                        updateStatus.startCnt--;
-                    }
-                    else {
-                        updateStatus.errorLimit = 2;
-                    }
+                    },
+                    callback: function () {
+                        // Hold off any errors until after the startup time.
+                        // This is necessary for slower (embedded) machines
+                        if (updateStatus.startCnt > 0) {
+                            updateStatus.startCnt--;
+                        }
+                        else {
+                            updateStatus.errorLimit = 2;
+                        }
 
-                    if(updateStatus.statusCount >= updateStatus.errorLimit)
-                        handleOnlineStatus(STATUS_OFFLINE);
-                    else if(updateStatus.statusCount == 0)
-                        handleOnlineStatus(STATUS_ONLINE);
-                }
-            });
+                        if (updateStatus.statusCount >= updateStatus.errorLimit) {
+                            updateStatus.timeout = 30000;
+                            handleOnlineStatus(STATUS_OFFLINE);
+                        }
+                        else if (updateStatus.statusCount == 0) {
+                            updateStatus.timeout = 2500;
+                            handleOnlineStatus(STATUS_ONLINE);
+                        }
+                    }
+                });
+            }
         },
-        interval: 2500,
+        timeout: 30000,
+        interval: 5000,
         startCnt: 6,
         statusCount: 0,
         errorLimit: 6
@@ -453,8 +551,10 @@ function getItemTypeIcon(type) {
  * The main GUI creation method
  */
 function createUI() {
-    Ext.QuickTips.init();
     delete Ext.tip.Tip.prototype.minWidth;
+
+    Ext.QuickTips.init();
+    Ext.state.Manager.setProvider(new Ext.state.CookieProvider());
 
     //======= Quartz CRON Rule Store
     Ext.define('CRONRuleModel', {
@@ -539,9 +639,9 @@ function createUI() {
                     // Select the default service
                     for (var cnt = 0; cnt < store.getCount(); cnt++) {
                         var actions = [].concat(store.getAt(cnt).get("actions"));
-                        // TODO: Better method to determine default needed!!!
                         if (actions.indexOf("Read")) {
-                            persistenceService = store.getAt(cnt).get("name");
+                            if(persistenceService == "")
+                                persistenceService = store.getAt(cnt).get("name");
                             var newItem = {};
                             newItem.text = store.getAt(cnt).get("name");
                             newItem.icon = "images/database-sql.png";
@@ -657,7 +757,7 @@ function createUI() {
     });
 
 //======= Rule Template Store
-    Ext.define('RuleTemplateModel', {
+/*    Ext.define('RuleTemplateModel', {
         extend: 'Ext.data.Model',
         fields: [
             {name: 'name'},
@@ -682,6 +782,29 @@ function createUI() {
             reader: {
                 type: 'json',
                 root: 'rule'
+            },
+            headers: {'Accept': 'application/json'},
+            pageParam: undefined,
+            startParam: undefined,
+            sortParam: undefined,
+            limitParam: undefined
+        },
+        autoLoad: true
+    });*/
+
+//======= Design Store
+    // Load the rules for this item
+    designStore = Ext.create('Ext.data.JsonStore', {
+        fields: [
+            {name: 'id'},
+            {name: 'name'}
+        ],
+        proxy: {
+            type: 'rest',
+            url: HABminBaseURL + '/config/designer',
+            reader: {
+                type: 'json',
+                root: 'designs'
             },
             headers: {'Accept': 'application/json'},
             pageParam: undefined,
@@ -726,7 +849,7 @@ function createUI() {
 
 
 //======= Rule Store
-    Ext.define('RuleModel', {
+/*    Ext.define('RuleModel', {
         extend: 'Ext.data.Model',
         fields: [
             {name: 'item'},
@@ -752,7 +875,7 @@ function createUI() {
             limitParam: undefined
         },
         autoLoad: true
-    });
+    });*/
 
 
 //======= Item Config Store
@@ -878,7 +1001,7 @@ function createUI() {
                         closable: false,
                         tooltip: language.mainTab_UserSettings,
                         icon: "images/user-green.png",
-                        handler:function () {
+                        handler: function () {
                             var store = Ext.create('Ext.data.ArrayStore', {
                                 fields: [
                                     {name: 'code'},
@@ -897,7 +1020,7 @@ function createUI() {
                                 border: false,
                                 bodyPadding: 10,
                                 fieldDefaults: {
-                                    labelAlign: 'top',
+                                    labelAlign: 'left',
                                     labelWidth: 100,
                                     labelStyle: 'font-weight:bold'
                                 },
@@ -906,7 +1029,7 @@ function createUI() {
                                 },
                                 items: [
                                     {
-                                        margin: '0 0 0 0',
+//                                        margin: '0 0 0 0',
                                         xtype: 'combobox',
                                         fieldLabel: language.personalisation_Language,
                                         itemId: 'language',
@@ -916,9 +1039,26 @@ function createUI() {
                                         valueField: 'code',
                                         displayField: 'nativeName',
                                         forceSelection: true,
-                                        editable: true,
+                                        editable: false,
                                         typeAhead: true,
-                                        queryMode: 'local'
+                                        queryMode: 'local',
+                                        value: languageCode
+                                    },
+                                    {
+                                    //    margin: '0 0 0 0',
+                                        xtype: 'combobox',
+                                        fieldLabel: language.personalisation_PersistenceStore,
+                                        itemId: 'persistence',
+                                        name: 'persistence',
+                                        store: persistenceServiceStore,
+                                        allowBlank: false,
+                                        valueField: 'name',
+                                        displayField: 'name',
+                                        forceSelection: true,
+                                        editable: false,
+                                        typeAhead: true,
+                                        queryMode: 'local',
+                                        value: persistenceService
                                     }
                                 ],
                                 buttons: [
@@ -933,12 +1073,25 @@ function createUI() {
                                         handler: function () {
                                             if (this.up('form').getForm().isValid()) {
                                                 // Read the model name
-                                                var languageCode = form.getForm().findField('language').getSubmitValue();
+                                                var lang = languageCode;
+                                                languageCode = form.getForm().findField('language').getSubmitValue();
                                                 Ext.util.Cookies.set("language", languageCode);
-                                                loadLanguage(languageCode);
+
+                                                persistenceService = form.getForm().findField('persistence').getSubmitValue();
+                                                Ext.util.Cookies.set("persistence", persistenceService);
+
+                                                // Update the button for selecting the persistence service
+                                                var button = Ext.getCmp("persistenceServiceSelect");
+                                                if (button != null) {
+                                                    button.setText(persistenceService);
+                                                    persistenceItemStore.filterItems(persistenceService);
+                                                }
 
                                                 this.up('window').destroy();
-                                                window.location.reload();
+                                                if(lang != languageCode) {
+                                                    loadLanguage(languageCode);
+                                                    window.location.reload();
+                                                }
                                             }
                                         }
                                     }
@@ -948,7 +1101,7 @@ function createUI() {
                             var saveWin = Ext.widget('window', {
                                 header: false,
                                 closeAction: 'destroy',
-                                width: 225,
+                                width: 325,
                                 resizable: false,
                                 draggable: false,
                                 modal: true,
@@ -997,4 +1150,6 @@ function createUI() {
     // Create the status toolbar and start the status update thread
     statusTooltip = Ext.create('Ext.tip.ToolTip', {target: 'onlineStatus', html: language.onlineState_Offline});
     doStatus();
+
+    getReleaseVersion();
 }

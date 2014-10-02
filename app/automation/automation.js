@@ -41,6 +41,7 @@ Ext.define('openHAB.automation.automation', {
     icon: 'images/compass.png',
     id: 'maintabAutomation',
     cls: 'empty',
+    autoDestroy: true,
 
     initComponent: function () {
         this.title = language.mainTab_Automation;
@@ -56,6 +57,8 @@ Ext.define('openHAB.automation.automation', {
             border: false,
             region: 'west',
             width: 600,
+            stateId: 'automationWindowSizer',
+            stateful: true,
             layout: {
                 type: 'accordion',
                 hideCollapseTool: true
@@ -81,10 +84,6 @@ Ext.define('openHAB.automation.automation', {
                 this.removeAll(true);
             }
         });
-
-        var chartGraph = Ext.create('openHAB.automation.ruleProperties');
-
-        propertyContainer.add(chartGraph);
 
         this.items = [accordion, propertyContainer];
 

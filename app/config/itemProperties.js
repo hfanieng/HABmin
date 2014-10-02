@@ -135,7 +135,6 @@ Ext.define('openHAB.config.itemProperties', {
                     displayField: 'label',
                     valueField: 'name',
                     forceSelection: true,
-                    editable: false,
                     allowBlank: false,
                     listConfig: {
                         getInnerTpl: function () {
@@ -391,7 +390,6 @@ Ext.define('openHAB.config.itemProperties', {
                 type: 'vbox',
                 align: 'stretch'
             },
-//            layout: 'fit',
             tbar: toolbar,
             border: false,
             items: [itemOptions, itemPersistenceOptions, itemExtendedOptions]
@@ -401,7 +399,7 @@ Ext.define('openHAB.config.itemProperties', {
         var statusBar = Ext.create('Ext.ux.StatusBar', {text: '-', items: [helpStatusText]});
 
         var itemGroups = Ext.create('openHAB.config.groupTree');
-        var itemRules = Ext.create('openHAB.config.itemRules');
+//        var itemRules = Ext.create('openHAB.config.itemRules');
         var itemBindings = Ext.create('openHAB.config.itemBindings');
 
         // Create the tab container for the item configuration
@@ -410,7 +408,8 @@ Ext.define('openHAB.config.itemProperties', {
 //            itemId: 'itemProperties',
             bbar: statusBar,
             border: false,
-            items: [itemProperties, itemGroups, itemRules, itemBindings],
+            items: [itemProperties, itemGroups, itemBindings],
+//            items: [itemProperties, itemGroups, itemRules, itemBindings],
             listeners: {
                 beforetabchange: function (tabPanel, newCard, oldCard, eOpts) {
                     // Detect if we've changed view so we can collate the data from the sub-tabs
@@ -444,30 +443,46 @@ Ext.define('openHAB.config.itemProperties', {
                     var tbProperties = itemProperties.getDockedComponent('toolbar');
                     var tbBinding = itemBindings.getDockedComponent('toolbar');
                     var tbGroup = itemGroups.getDockedComponent('toolbar');
-                    var tbRules = itemRules.getDockedComponent('toolbar');
+//                    var tbRules = itemRules.getDockedComponent('toolbar');
                     if (stCancel == true) {
-                        tbProperties.getComponent('cancel').disable();
-                        tbBinding.getComponent('cancel').disable();
-                        tbGroup.getComponent('cancel').disable();
-                        tbRules.getComponent('cancel').disable();
+                        if (tbProperties != null)
+                            tbProperties.getComponent('cancel').disable();
+                        if (tbBinding != null)
+                            tbBinding.getComponent('cancel').disable();
+                        if (tbGroup != null)
+                            tbGroup.getComponent('cancel').disable();
+//                        if (tbRules != null)
+//                            tbRules.getComponent('cancel').disable();
                     }
                     else {
-                        tbProperties.getComponent('cancel').enable();
-                        tbBinding.getComponent('cancel').enable();
-                        tbGroup.getComponent('cancel').enable();
-                        tbRules.getComponent('cancel').enable();
+                        if (tbProperties != null)
+                            tbProperties.getComponent('cancel').enable();
+                        if (tbBinding != null)
+                            tbBinding.getComponent('cancel').enable();
+                        if (tbGroup != null)
+                            tbGroup.getComponent('cancel').enable();
+//                        if (tbRules != null)
+//                            tbRules.getComponent('cancel').enable();
                     }
                     if (stSave == true) {
-                        tbProperties.getComponent('save').disable();
-                        tbBinding.getComponent('save').disable();
-                        tbGroup.getComponent('save').disable();
-                        tbRules.getComponent('save').disable();
+                        if (tbProperties != null)
+                            tbProperties.getComponent('save').disable();
+                        if (tbBinding != null)
+                            tbBinding.getComponent('save').disable();
+                        if (tbGroup != null)
+                            tbGroup.getComponent('save').disable();
+//                        if (tbRules != null)
+//                            tbRules.getComponent('save').disable();
                     }
                     else {
-                        tbProperties.getComponent('save').enable();
-                        tbBinding.getComponent('save').enable();
-                        tbGroup.getComponent('save').enable();
-                        tbRules.getComponent('save').enable();
+                        if (tbProperties != null)
+                            tbProperties.getComponent('save').enable();
+                        if (tbBinding != null)
+                            tbBinding.getComponent('save').enable();
+                        if (tbGroup != null)
+                            tbGroup.getComponent('save').enable();
+//                        if (tbRules != null)
+//                            tbRules.getComponent('save').enable();
                     }
                 }
             }
@@ -494,16 +509,20 @@ Ext.define('openHAB.config.itemProperties', {
             if (binding1.length != binding2.length)
                 return false;
             for (var i = 0; i < binding1.length; i++) {
+                if(binding1[i] == null)
+                    continue;
                 var found = false;
                 for (var c = 0; c < binding1.length; c++) {
-                    if(binding1[i].binding != binding2[c].binding)
+                    if(binding2[c] == null)
                         continue;
-                    if(binding1[i].config == binding2[i].config) {
+                    if (binding1[i].binding != binding2[c].binding)
+                        continue;
+                    if (binding1[i].config == binding2[i].config) {
                         found = true;
                         break;
                     }
                 }
-                if(found == false)
+                if (found == false)
                     return false;
             }
             return true;
@@ -543,7 +562,7 @@ Ext.define('openHAB.config.itemProperties', {
                     me.updatePersistenceItemProperties(json);
                 }
             });
-
+/*
             // Load the rules for this item
             Ext.Ajax.request({
                 url: HABminBaseURL + '/config/rules/item/' + itemName,
@@ -558,7 +577,7 @@ Ext.define('openHAB.config.itemProperties', {
 
                     me.updateExtendedItemProperties(json);
                 }
-            });
+            });*/
 
             // This is an existing item, so we don't allow the item name to be edited.
             newItem = false;
@@ -641,7 +660,7 @@ Ext.define('openHAB.config.itemProperties', {
                 save.disable();
 
             // Set the item name in the rules tab
-            itemRules.setItem(json.name);
+//            itemRules.setItem(json.name);
 
             // Helper function to make above code more readable
             function setValue(val) {
@@ -776,11 +795,11 @@ Ext.define('openHAB.config.itemProperties', {
             var me = this;
 
             var groups = itemGroups.getSelected();
-            if(compareGroups(groups, [].concat(itemData.groups)) == false)
+            if (compareGroups(groups, [].concat(itemData.groups)) == false)
                 itemPrimaryOptionsUpdated = true;
 
             var bindings = itemBindings.getBindings();
-            if(compareBindings(bindings, [].concat(itemData.bindings)) == false)
+            if (compareBindings(bindings, [].concat(itemData.bindings)) == false)
                 itemPrimaryOptionsUpdated = true;
 
             // Check if this data has changed

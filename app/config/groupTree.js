@@ -49,7 +49,22 @@ Ext.define('openHAB.config.groupTree', {
             xtype: 'treecolumn',
             text: 'Group',
             flex: 2,
-            dataIndex: 'group'
+            dataIndex: 'group',
+            renderer: function (value, meta, record) {
+                // Rendering of the item
+                // This will use the values specified in the sitemap if set
+                // Otherwise it will default to showing the default item configuration
+                var label = value;
+                var icon = record.get("groupicon");
+                var item = record.get("group");
+                var labelClass = "sitemap-label-set";
+
+                if (icon != "")
+                    icon = '<img src="../images/' + icon + '.png" align="left" height="16">';
+
+                return icon  + label;
+                return '<div>' + icon + '</div><div class="' + labelClass + '">' + label + '</div>';
+            }
         }
     ],
     rootVisible: false,
@@ -59,10 +74,11 @@ Ext.define('openHAB.config.groupTree', {
     },
 
     initComponent: function () {
+        var me = this;
         this.title = language.config_GroupsTitle;
 
         this.tbar = Ext.create('Ext.toolbar.Toolbar', {
-            itemId:'toolbar',
+            itemId: 'toolbar',
             items: [
                 {
                     icon: 'images/cross.png',
@@ -73,27 +89,26 @@ Ext.define('openHAB.config.groupTree', {
                     tooltip: language.config_ItemPropertiesCancelChangeTip,
                     handler: function () {
                         this.up('#itemPropertiesMain').revertItem();
-                        toolbar.getComponent('cancel').disable();
-                        toolbar.getComponent('save').disable();
-                        toolbar.getComponent('delete').disable();
+                        me.toolbar.getComponent('cancel').disable();
+                        me.toolbar.getComponent('save').disable();
                     }
                 },
                 {
-                    icon:'images/disk.png',
-                    itemId:'save',
+                    icon: 'images/disk.png',
+                    itemId: 'save',
                     text: language.save,
-                    cls:'x-btn-icon',
-                    disabled:false,
-                    tooltip:language.config_ItemPropertiesSaveChangeTip,
-                    handler:function () {
+                    cls: 'x-btn-icon',
+                    disabled: false,
+                    tooltip: language.config_ItemPropertiesSaveChangeTip,
+                    handler: function () {
                         this.up('#itemPropertiesMain').saveItem();
-                        toolbar.getComponent('cancel').disable();
-                        toolbar.getComponent('save').disable();
-                        toolbar.getComponent('delete').disable();
+                        me.toolbar.getComponent('cancel').disable();
+                        me.toolbar.getComponent('save').disable();
                     }
                 }
-                ]
+            ]
         });
+        this.toolbar = this.tbar;
 
         // Add the model for the group tree
         Ext.define('GroupTree', {
@@ -101,7 +116,7 @@ Ext.define('openHAB.config.groupTree', {
             fields: [
                 {name: 'checked'},
                 {name: 'group'},
-                {name: 'icon'}
+                {name: 'groupicon'}
             ]
         });
 
@@ -138,27 +153,26 @@ Ext.define('openHAB.config.groupTree', {
                 return;
 
             // Loop through the items
-            var numItems = itemConfigStore.getCount();
-            for (var iItem = 0; iItem < numItems; ++iItem) {
+            var allRecords = itemConfigStore.queryBy(function(){return true;});
+            allRecords.each(function(item) {
                 // Is this a group
-                var item = itemConfigStore.getAt(iItem);
                 if (item.get('type') != 'GroupItem')
-                    continue;
+                    return;
 
                 // Ensure the groups is an array!
                 var groups = [].concat(item.get('groups'));
 
                 // Check if the item is in the required group
-                if (groups.indexOf(group) == -1) {
-                    continue;
-                }
+                if (groups.indexOf(group) == -1)
+                    return;
 
                 // Create the new group
                 var newGroup = [];
                 newGroup.checked = false;
                 newGroup.id = item.get('name');
                 newGroup.group = item.get('name');
-                newGroup.icon = item.get('icon');
+                newGroup.iconx = '../images/'+item.get('icon')+'.png';
+                newGroup.groupicon = item.get('icon');
                 newGroup.children = [];
 
                 // Check if this is a group
@@ -169,7 +183,7 @@ Ext.define('openHAB.config.groupTree', {
                 else
                     newGroup.leaf = false;
                 parent.push(newGroup);
-            }
+            });
         }
 
         this.resetGroups = function () {
@@ -179,7 +193,7 @@ Ext.define('openHAB.config.groupTree', {
 
                 node.set('checked', false);
             });
-        }
+        };
 
         this.setGroup = function (group) {
             var rec = groupTreeStore.getNodeById(group);
@@ -187,7 +201,7 @@ Ext.define('openHAB.config.groupTree', {
                 return;
 
             rec.set("checked", true);
-        }
+        };
 
         this.getSelected = function () {
             var selList = [];
@@ -201,8 +215,13 @@ Ext.define('openHAB.config.groupTree', {
             });
 
             return selList;
+        };
+    },
+    listeners: {
+        checkchange: function( node, checked, eOpts ) {
+            this.toolbar.getComponent('cancel').enable();
+            this.toolbar.getComponent('save').enable();
         }
-
     }
 })
 ;

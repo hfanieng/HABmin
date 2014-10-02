@@ -1,5 +1,8 @@
 Updates
 -------
+* 30-04-2014: Initial graphical rule designer ready for testing (see the [rules branch](https://github.com/cdjackson/HABmin/tree/rules) for code, or [the overview here](https://github.com/cdjackson/HABmin/wiki/Rule-Designer:-Overview))
+* 18-04-2014: Add ability to view _HABmin_ charts wihin openHAB sitemap.
+* 22-03-2014: Add a 'data pending' indicator in zwave to show when a configuration has not been confirmed.
 * 02-02-2014: Updated item editing to extend toolbar across all tabs. Added a filter option to filter listed items.
 * 20-01-2014: Added ability to save and restore charts. This allows considerable customisation of the graphs.
 
@@ -48,26 +51,34 @@ The project is just getting started. Currently implemented are the following -:
 * Item rule library (initial test phase)
 * ZWave configuration interface (note: work in progress still)
 
-Additionally, lot of the initial user interface has been boilerplated and some work has started on the REST interface for configuring bindings.
+Additionally, lot of the initial user interface has been boilerplated.
 
 Technology
 ----------
 _HABmin_ is an open source project. It makes use of a number of libraries under GPL license. The following major libraries are used -:
 * ExtJS from Sencha
 * Highcharts from Highsoft
+* moment.js for time management
+* JIT for some special charts
 
 ![Bundles Screen](https://raw.github.com/wiki/cdjackson/HABmin/habmin_systembundles.png)
 
 Installation
 ------------
-* Download the project zip file from GitHub and unzip files in the directory webapps/habmin (you will need to create this directory).
+Note that _HABmin_ requires version 1.4 or above of openHAB.
+You can either use the compiled release version, or the source version. It's also possible to use a combination of the two if you know what you're doing - be careful though since the compiled version does merge some files to speed things up.
+
+The release version is a compiled, minified version which increases the loading speed, and reduces the space used on the disk (useful if you're running on an embedded system like the Pi).
+To install, simply unzip from the openHAB main directory. This will put the _HABmin_ files in the webapps directory, and the plugins in the adons directory.
+
+Alternatively, installing the source code version is done as follows -:
+* Download the project zip file from GitHub and unzip files in the directory webapps/habmin (you will need to create this directory - note that the directory name must be **lower case**).
 * Place the org.openhab.io.habmin*.jar file into the addons directory (this is stored in the addons directory in the repository).
 * Place the org.openhab.binding.zwave*.jar into the addons directory (this is stored in the addons directory in the repository). Note that this bundle is currently required for _HABmin_ to start, but if you don't have zwave then it won't actually run if it's not configured. In the longer term this dependency will be removed.
 
-You will probably need to restart openHAB for the new interfaces to take affect.
+Either way, you will probably need to restart openHAB for the new interfaces to take affect.
 
 You can then start _HABmin_ at the address [http://localhost:8080/habmin/index.html](http://localhost:8080/habmin/index.html) (assuming openHAB is running on your local computer using the default port - if this is not the case, you will need to adjust the address accordingly).
-
 
 Contributing
 ------------
